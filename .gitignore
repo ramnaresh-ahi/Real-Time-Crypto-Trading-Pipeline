@@ -1,3 +1,4 @@
 # Ignore these files & folders
 cryptotrading
 airflow/airflow.cfg
+mongo_loader/data
