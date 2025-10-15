@@ -1,3 +1,4 @@
 # Ignore these files & folders
 cryptotrading
 airflow/airflow.cfg
+monogo_loader/data
