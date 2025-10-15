@@ -1,0 +1,178 @@
+services:
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    networks:
+      - rt-crypto-net
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  # Kafka broker
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    networks:
+      - rt-crypto-net
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # MongoDB (replica set for change streams)
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    networks:
+      - rt-crypto-net
+    command: ["--replSet", "rs0"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo_loader/data:/data/db
+
+  # PostgreSQL for Airflow metadata
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    networks:
+      - rt-crypto-net
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./airflow/postgres_data:/var/lib/postgresql/data
+
+  airflow-init:
+    image: apache/airflow:2.7.0
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-init
+    networks:
+      - rt-crypto-net
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: "pzB8rph6D7uxzHb2SbxKIuP8zjhRVUn5k6EDZ2k8SIQ"
+      AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./airflow:/opt/airflow/config
+    entrypoint: >
+      bash -c "airflow db upgrade && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin@123 || true"
+
+  # Airflow scheduler
+  airflow-scheduler:
+    image: apache/airflow:2.7.0
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-scheduler
+    networks:
+      - rt-crypto-net
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: "pzB8rph6D7uxzHb2SbxKIuP8zjhRVUn5k6EDZ2k8SIQ"
+      AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./airflow:/opt/airflow/config
+    command: >
+      scheduler
+  
+  # Airflow webserver
+  airflow-webserver:
+    image: apache/airflow:2.7.0
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-webserver
+    networks:
+      - rt-crypto-net
+    depends_on:
+      - airflow-scheduler
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: "pzB8rph6D7uxzHb2SbxKIuP8zjhRVUn5k6EDZ2k8SIQ"
+      AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./airflow:/opt/airflow/config
+    command: >
+      webserver
+
+
+  # (Optional) Kafka UI for monitoring
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    networks:
+      - rt-crypto-net
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+  #mongo_consumer
+  mongo-consumer:
+    build:
+      context: ./mongo_consumer
+      dockerfile: Dockerfile
+    container_name: mongo-consumer
+    networks:
+      - rt-crypto-net
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB=crypto
+      - MONGO_COLLECTION=trades_raw
+    depends_on:
+      - kafka
+      - mongodb
+
+  #pg_consumer
+  pg-consumer:
+    build:
+      context: ./pg_consumer
+      dockerfile: Dockerfile
+    container_name: pg-consumer
+    networks:
+      - rt-crypto-net
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - POSTGRES_CONN=host=postgres port=5432 dbname=airflow user=airflow password=airflow
+    depends_on:
+      - kafka
+      - postgres
+
+networks:
+  rt-crypto-net:
+    driver: bridge
+
+
+
+
+
+

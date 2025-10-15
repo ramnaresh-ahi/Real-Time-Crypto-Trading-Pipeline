@@ -1,0 +1,22 @@
+db.trades_raw.find().limit(5).pretty()
+use crypto
+rs.status()
+mongo
+mongosh
+exit
+db.trades_raw.find().limit(5).pretty()
+use crypto
+rs.status()
+rs.reconfig(newcfg, {force: true})
+newcfg = { _id: "rs0", members: [{ _id: 0, host: "mongodb:27017" }] }
+printjson(cfg)
+cfg = rs.conf()
+rs.status()
+rs.initiate()
+rs.status()
+exit
+db.trades_raw.find().limit(5).pretty()
+use crypto
+exit
+rs.status()
+rs.initiate()
