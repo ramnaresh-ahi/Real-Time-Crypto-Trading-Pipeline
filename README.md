@@ -198,7 +198,7 @@ Real-Time-Crypto-Trading-Pipeline/
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/ramnaresh-ahi/Real-Time-Crypto-Trading-Pipeline.git
    cd Real-Time-Crypto-Trading-Pipeline
    ```
 
@@ -339,7 +339,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👤 Author
 
-**Your Name**
+**Ramnaresh Ahirwar**
 - GitHub: [@ramnaresh-ahi](https://github.com/ramnaresh-ahi)
 - LinkedIn: [Ramnaresh Ahirwar](https://www.linkedin.com/in/ramnaresh-ahirwar-77abc/)
 
